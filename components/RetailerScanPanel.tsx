@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import { ArbitrageResultsTable } from '@/components/ArbitrageResultsTable';
 import type { EbayMarketplaceAnalysis } from '@/models/EbayMarketplaceAnalysis';
 import { EbayMarketplaceService } from '@/services/ebayMarketplaceService';
 
@@ -17,7 +18,7 @@ export function RetailerScanPanel({ retailerName, productNames }: RetailerScanPa
 
   async function runScan() {
     setLoading(true);
-    const analyses = await service.analyzeProducts(productNames);
+    const analyses = await service.analyzeProducts(productNames, retailerName);
     setResults(analyses);
     setLoading(false);
   }
@@ -34,27 +35,9 @@ export function RetailerScanPanel({ retailerName, productNames }: RetailerScanPa
       </button>
 
       {results.length > 0 ? (
-        <div className="architecture-list">
-          {results.map((analysis) => (
-            <div key={analysis.productName}>
-              <h3>{analysis.productName}</h3>
-              <ul>
-                <li>Lowest Buy It Now: ${analysis.lowestBuyItNow}</li>
-                <li>Average Recent Sold: ${analysis.averageRecentSoldPrice}</li>
-                <li>Sold Listings: {analysis.soldListingsCount}</li>
-                <li>7-Day Trend: {analysis.sevenDayTrend}</li>
-                <li>30-Day Trend: {analysis.thirtyDayTrend}</li>
-                <li>Estimated eBay Fees: ${analysis.estimatedEbayFees}</li>
-                <li>Estimated Shipping: ${analysis.estimatedShipping}</li>
-                <li>Net Profit: ${analysis.netProfit}</li>
-                <li>ROI: {analysis.roiPercentage}%</li>
-                <li>Opportunity Score: {analysis.opportunityScore}/100</li>
-              </ul>
-            </div>
-          ))}
-        </div>
+        <ArbitrageResultsTable rows={results} />
       ) : (
-        <p className="subtitle">Use the scan button to run placeholder eBay analysis for this retailer.</p>
+        <p className="subtitle">Click the scan button to inspect a sortable arbitrage results table.</p>
       )}
     </section>
   );

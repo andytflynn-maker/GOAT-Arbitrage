@@ -149,6 +149,111 @@ h1 {
   line-height: 1.65;
 }
 
+.table-shell {
+  margin-top: 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+}
+
+.results-table th,
+.results-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.95rem;
+}
+
+.results-table th {
+  background: rgba(255,255,255,0.04);
+}
+
+.sort-button {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 600;
+}
+
+.product-image {
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.trend-pill,
+.score-pill,
+.recommendation-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trend-positive {
+  background: rgba(34, 197, 94, 0.16);
+  color: #8ff0b7;
+}
+
+.trend-negative {
+  background: rgba(248, 113, 113, 0.16);
+  color: #ffb0b0;
+}
+
+.trend-neutral {
+  background: rgba(255,255,255,0.08);
+  color: #d2d8ea;
+}
+
+.score-high {
+  background: rgba(34, 197, 94, 0.16);
+  color: #8ff0b7;
+}
+
+.score-medium {
+  background: rgba(250, 204, 21, 0.16);
+  color: #fde68a;
+}
+
+.score-low {
+  background: rgba(248, 113, 113, 0.16);
+  color: #ffb0b0;
+}
+
+.recommendation-positive {
+  background: rgba(34, 197, 94, 0.16);
+  color: #8ff0b7;
+}
+
+.recommendation-neutral {
+  background: rgba(250, 204, 21, 0.16);
+  color: #fde68a;
+}
+
+.recommendation-negative {
+  background: rgba(248, 113, 113, 0.16);
+  color: #ffb0b0;
+}
+
 @media (max-width: 720px) {
   .retailer-grid,
   .stats-grid,
