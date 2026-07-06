@@ -1,12 +1,28 @@
 import { ArchitectureOverview } from '@/components/ArchitectureOverview';
+import { RetailerScanPanel } from '@/components/RetailerScanPanel';
 import { runAnalysis } from '@/services/analysisService';
 
 const retailers = [
-  "Scan Dave & Adam's",
-  "Scan Steel City",
-  "Scan Blowout",
-  "Scan Midwest Cards",
-  "Scan CardGiants",
+  {
+    name: "Dave & Adam's",
+    products: ['2024 Topps Chrome Sapphire Refractor', '2023 Panini Prizm Silver Prizm'],
+  },
+  {
+    name: 'Steel City Collectibles',
+    products: ['2024 Topps Series 1 Hobby Box', '2023 Panini Select Blaster Box'],
+  },
+  {
+    name: 'Blowout Cards',
+    products: ['2024 Pokémon Scarlet & Violet Booster Box', '2024 Topps Series 1 Hobby Box'],
+  },
+  {
+    name: 'Midwest Cards',
+    products: ['2023 Panini Select Blaster Box', '2024 Topps Chrome Sapphire Refractor'],
+  },
+  {
+    name: 'CardGiants',
+    products: ['2024 Pokémon Scarlet & Violet Booster Box', '2024 Topps Chrome Sapphire Refractor'],
+  },
 ];
 
 export default async function HomePage() {
@@ -19,21 +35,13 @@ export default async function HomePage() {
       <section className="hero-card">
         <p className="eyebrow">GOAT Arbitrage</p>
         <h1>GOAT Arbitrage</h1>
-        <p className="subtitle">A universal product model for cards and future collectibles</p>
-
-        <div className="retailer-grid" aria-label="Retailer scan actions">
-          {retailers.map((retailer) => (
-            <button key={retailer} type="button" className="retailer-button">
-              {retailer}
-            </button>
-          ))}
-        </div>
+        <p className="subtitle">A universal product model with mocked eBay pricing intelligence</p>
       </section>
 
       <section className="dashboard-card" aria-label="Dashboard overview">
         <div className="dashboard-header">
           <h2>Live intelligence</h2>
-          <p>Foundation UI for upcoming dealer analysis.</p>
+          <p>Click a retailer scan card to review realistic sample eBay analysis.</p>
         </div>
 
         <div className="stats-grid">
@@ -49,6 +57,19 @@ export default async function HomePage() {
             <span className="stat-label">Estimated profit</span>
             <strong>${estimatedProfit.toFixed(2)}</strong>
           </article>
+        </div>
+      </section>
+
+      <section className="dashboard-card" aria-label="Retailer scan panels">
+        <div className="dashboard-header">
+          <h2>Retailer scans</h2>
+          <p>Each panel uses the reusable eBay marketplace service with mocked data.</p>
+        </div>
+
+        <div className="retailer-grid" aria-label="Retailer scan actions">
+          {retailers.map((retailer) => (
+            <RetailerScanPanel key={retailer.name} retailerName={retailer.name} productNames={retailer.products} />
+          ))}
         </div>
       </section>
 
