@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from 'react';
+import RetailerShopPanel from '@/components/RetailerShopPanel';
 import { calculateOpportunity } from '@/services/profitEngine';
 
 type SearchResultRow = {
@@ -218,31 +219,7 @@ export default function HomePage() {
         </div>
 
         {activeTab === 'shop' ? (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: '12px',
-              marginBottom: '20px',
-            }}
-          >
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Retailers</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{shopSummary.retailerCount}</div>
-            </div>
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Lowest Price</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(shopSummary.lowestPrice)}</div>
-            </div>
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Average Price</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(shopSummary.averagePrice)}</div>
-            </div>
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Highest Price</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(shopSummary.highestPrice)}</div>
-            </div>
-          </div>
+          <RetailerShopPanel rows={shopRows} summary={shopSummary} />
         ) : summary ? (
           <div
             style={{
