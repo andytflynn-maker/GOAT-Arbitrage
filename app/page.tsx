@@ -146,7 +146,7 @@ export default function HomePage() {
               name="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search for any collectible..."
+              placeholder="Search cards, Pokémon, sneakers, LEGO, coins, comics..."
               style={{
                 flex: 1,
                 padding: '16px 18px',
