@@ -64,6 +64,7 @@ const shopRows = [
 
 export default function HomePage() {
   const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Sports Cards');
   const [activeTab, setActiveTab] = useState<'shop' | 'arbitrage'>('shop');
   const [rows, setRows] = useState<SearchResultRow[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
@@ -140,50 +141,85 @@ export default function HomePage() {
 
       <section className="dashboard-card" style={{ padding: '24px' }}>
         <form onSubmit={handleSearch} style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '780px', display: 'flex', gap: '12px' }}>
-            <input
-              type="text"
-              name="q"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search cards, Pokémon, sneakers, LEGO, coins, comics..."
-              style={{
-                flex: 1,
-                padding: '16px 18px',
-                borderRadius: '999px',
-                border: '1px solid #d7dce5',
-                fontSize: '16px',
-                outline: 'none',
-                boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={isSearching}
-              style={{
-                minWidth: '120px',
-                padding: '0 18px',
-                borderRadius: '999px',
-                border: '1px solid #0f172a',
-                background: isSearching ? '#334155' : '#0f172a',
-                color: 'white',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: isSearching ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isSearching ? (
-                <>
-                  <span style={{ width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '999px', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                  Searching...
-                </>
-              ) : (
-                'Search'
-              )}
-            </button>
+          <div style={{ width: '100%', maxWidth: '780px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>
+              <span>Category</span>
+              <select
+                value={selectedCategory}
+                onChange={(event) => setSelectedCategory(event.target.value)}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: '999px',
+                  border: '1px solid #475569',
+                  background: '#020617',
+                  color: 'white',
+                  fontSize: '15px',
+                  outline: 'none',
+                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.12)',
+                }}
+              >
+                <option value="Sports Cards">Sports Cards</option>
+                <option value="Trading Card Games">Trading Card Games</option>
+                <option value="Sneakers">Sneakers</option>
+                <option value="Coins">Coins</option>
+                <option value="Currency">Currency</option>
+                <option value="Stamps">Stamps</option>
+                <option value="Vinyl Records">Vinyl Records</option>
+                <option value="Video Games">Video Games</option>
+                <option value="LEGO">LEGO</option>
+                <option value="Action Figures">Action Figures</option>
+                <option value="Comics">Comics</option>
+                <option value="Memorabilia">Memorabilia</option>
+                <option value="Watches">Watches</option>
+                <option value="Luxury Goods">Luxury Goods</option>
+                <option value="Other Collectibles">Other Collectibles</option>
+              </select>
+            </label>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <input
+                type="text"
+                name="q"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search cards, Pokémon, sneakers, LEGO, coins, comics..."
+                style={{
+                  flex: 1,
+                  padding: '16px 18px',
+                  borderRadius: '999px',
+                  border: '1px solid #d7dce5',
+                  fontSize: '16px',
+                  outline: 'none',
+                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={isSearching}
+                style={{
+                  minWidth: '120px',
+                  padding: '0 18px',
+                  borderRadius: '999px',
+                  border: '1px solid #0f172a',
+                  background: isSearching ? '#334155' : '#0f172a',
+                  color: 'white',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: isSearching ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isSearching ? (
+                  <>
+                    <span style={{ width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '999px', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                    Searching...
+                  </>
+                ) : (
+                  'Search'
+                )}
+              </button>
+            </div>
           </div>
         </form>
 
