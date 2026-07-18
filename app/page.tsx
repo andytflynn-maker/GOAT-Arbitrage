@@ -437,6 +437,36 @@ export default function HomePage() {
           </div>
         ) : null}
 
+        {activeTab === 'arbitrage' && selectedProduct ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '18px 20px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #0f172a 0%, #111827 100%)',
+              border: '1px solid #334155',
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.2)',
+            }}
+          >
+            <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '8px' }}>
+              Focused Opportunity
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#f8fafc', marginBottom: '10px' }}>
+              Analyzing: {selectedProduct.title}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', color: '#e2e8f0', fontSize: '14px' }}>
+              <div>
+                <span style={{ color: '#94a3b8', marginRight: '6px' }}>Retailer:</span>
+                <span style={{ fontWeight: 600 }}>{selectedProduct.retailer}</span>
+              </div>
+              <div>
+                <span style={{ color: '#94a3b8', marginRight: '6px' }}>Retail Price:</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(selectedProduct.retailPrice)}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {activeTab === 'arbitrage' && !isSearching && rows.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
