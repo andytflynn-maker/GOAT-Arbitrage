@@ -23,6 +23,13 @@ type SearchSummary = {
   highestPrice?: number | null;
 };
 
+type SelectedProduct = {
+  title: string;
+  category: string;
+  retailer: string;
+  retailPrice: number;
+};
+
 function formatCurrency(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return '—';
@@ -68,6 +75,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'shop' | 'arbitrage' | 'monitor'>('shop');
   const [rows, setRows] = useState<SearchResultRow[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -299,7 +307,7 @@ export default function HomePage() {
             }}
           >
             {[
-              { title: '🔥 Hot Restocks', subtitle: 'Coming Soon' },
+              { title: '🔥 Hot Restocks', subtitle: 'Coming Soon', onClick: () => setSelectedProduct({ title: '2025 Topps Chrome Baseball Hobby Box', category: 'Sports Cards', retailer: 'Blowout Cards', retailPrice: 389.99 }) },
               { title: '🚨 New Drops', subtitle: 'Coming Soon' },
               { title: '📈 Trending Products', subtitle: 'Coming Soon' },
               { title: '⭐ Best Opportunities', subtitle: 'Coming Soon' },
@@ -307,7 +315,12 @@ export default function HomePage() {
               <button
                 key={card.title}
                 type="button"
-                onClick={() => setActiveTab('arbitrage')}
+                onClick={() => {
+                  if (card.title === '🔥 Hot Restocks') {
+                    card.onClick?.();
+                  }
+                  setActiveTab('arbitrage');
+                }}
                 style={{
                   background: '#f8fafc',
                   borderRadius: '16px',
