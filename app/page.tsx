@@ -65,7 +65,7 @@ const shopRows = [
 export default function HomePage() {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Sports Cards');
-  const [activeTab, setActiveTab] = useState<'shop' | 'arbitrage'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'arbitrage' | 'monitor'>('shop');
   const [rows, setRows] = useState<SearchResultRow[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -272,10 +272,71 @@ export default function HomePage() {
           >
             💰 Arbitrage
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('monitor')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '999px',
+              border: '1px solid #cbd5e1',
+              background: activeTab === 'monitor' ? '#0f172a' : 'white',
+              color: activeTab === 'monitor' ? 'white' : '#0f172a',
+              fontWeight: 600,
+            }}
+          >
+            📡 Monitor
+          </button>
         </div>
 
         {activeTab === 'shop' ? (
           <RetailerShopPanel rows={shopRows} summary={shopSummary} />
+        ) : activeTab === 'monitor' ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '16px',
+            }}
+          >
+            {[
+              { title: '🔥 Hot Restocks', subtitle: 'Coming Soon' },
+              { title: '🚨 New Drops', subtitle: 'Coming Soon' },
+              { title: '📈 Trending Products', subtitle: 'Coming Soon' },
+              { title: '⭐ Best Opportunities', subtitle: 'Coming Soon' },
+            ].map((card) => (
+              <button
+                key={card.title}
+                type="button"
+                onClick={() => setActiveTab('arbitrage')}
+                style={{
+                  background: '#f8fafc',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)',
+                  minHeight: '140px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.transform = 'translateY(-2px)';
+                  event.currentTarget.style.boxShadow = '0 12px 30px rgba(15, 23, 42, 0.12)';
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.transform = 'translateY(0)';
+                  event.currentTarget.style.boxShadow = '0 8px 30px rgba(15, 23, 42, 0.06)';
+                }}
+              >
+                <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>{card.title}</div>
+                <div style={{ fontSize: '14px', color: '#64748b' }}>{card.subtitle}</div>
+              </button>
+            ))}
+          </div>
         ) : summary ? (
           <div
             style={{
