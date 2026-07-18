@@ -71,6 +71,26 @@ export default function HomePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  const categoryPlaceholders: Record<string, string> = {
+    'Sports Cards': 'Search Topps Chrome, Bowman, Prizm...',
+    'Trading Card Games': 'Search Pokémon, Lorcana, Magic...',
+    Sneakers: 'Search Jordan 1, Yeezy, New Balance...',
+    Coins: 'Search Morgan Dollar, Gold Eagle...',
+    Currency: 'Search Silver Dollar, Federal Reserve Note...',
+    Stamps: 'Search Penny Black, US Commemorative...',
+    'Vinyl Records': 'Search Beatles Abbey Road, Pink Floyd...',
+    'Video Games': 'Search Nintendo Switch, PS5, Xbox...',
+    LEGO: 'Search LEGO Star Wars, Technic...',
+    'Action Figures': 'Search Funko Pop, Star Wars Figure...',
+    Comics: 'Search Marvel Comics, Batman issue...',
+    Memorabilia: 'Search signed baseball, vintage poster...',
+    Watches: 'Search Rolex Submariner, Omega Seamaster...',
+    'Luxury Goods': 'Search Louis Vuitton bag, Rolex watch...',
+    'Other Collectibles': 'Search rare figurine, antique toy...',
+  };
+
+  const searchPlaceholder = categoryPlaceholders[selectedCategory] ?? 'Search cards, Pokémon, sneakers, LEGO, coins, comics...';
+
   const shopSummary = {
     retailerCount: shopRows.length,
     lowestPrice: Math.min(...shopRows.map((row) => row.price)),
@@ -181,7 +201,7 @@ export default function HomePage() {
                 name="q"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search cards, Pokémon, sneakers, LEGO, coins, comics..."
+                placeholder={searchPlaceholder}
                 style={{
                   flex: 1,
                   padding: '16px 18px',
