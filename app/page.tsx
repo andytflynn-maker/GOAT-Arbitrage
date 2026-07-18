@@ -106,11 +106,13 @@ export default function HomePage() {
     highestPrice: Math.max(...shopRows.map((row) => row.price)),
   };
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    event.stopPropagation();
+  async function handleSearch(eventOrTerm?: FormEvent<HTMLFormElement> | string) {
+    if (eventOrTerm && typeof eventOrTerm === 'object') {
+      eventOrTerm.preventDefault();
+      eventOrTerm.stopPropagation();
+    }
 
-    const trimmedQuery = query.trim();
+    const trimmedQuery = typeof eventOrTerm === 'string' ? eventOrTerm.trim() : query.trim();
 
     if (!trimmedQuery) {
       setRows([]);
@@ -318,6 +320,9 @@ export default function HomePage() {
                 onClick={() => {
                   if (card.title === '🔥 Hot Restocks') {
                     card.onClick?.();
+                    setActiveTab('arbitrage');
+                    void handleSearch('2025 Topps Chrome Baseball Hobby Box');
+                    return;
                   }
                   setActiveTab('arbitrage');
                 }}
@@ -378,8 +383,8 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        {isSearching ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Searching listings…</div>
+        {activeTab === 'arbitrage' && isSearching ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>🔄 Analyzing product...</div>
         ) : null}
 
         {!isSearching && message && rows.length === 0 ? (
