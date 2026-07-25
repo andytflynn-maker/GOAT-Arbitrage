@@ -30,6 +30,8 @@ type SelectedProduct = {
   retailPrice: number;
 };
 
+type AnalysisStatus = 'idle' | 'ready' | 'analyzing' | 'complete';
+
 function formatCurrency(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return '—';
@@ -76,6 +78,7 @@ export default function HomePage() {
   const [rows, setRows] = useState<SearchResultRow[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
   const [isSearching, setIsSearching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -106,19 +109,29 @@ export default function HomePage() {
     highestPrice: Math.max(...shopRows.map((row) => row.price)),
   };
 
-  async function handleSearch(eventOrTerm?: FormEvent<HTMLFormElement> | string) {
+  async function handleSearch(eventOrTerm?: FormEvent<HTMLFormElement> | string, options?: { isMonitorAnalysis?: boolean }) {
     if (eventOrTerm && typeof eventOrTerm === 'object') {
       eventOrTerm.preventDefault();
       eventOrTerm.stopPropagation();
     }
 
-    const trimmedQuery = typeof eventOrTerm === 'string' ? eventOrTerm.trim() : query.trim();
+    const isAutomaticAnalysis = typeof eventOrTerm === 'string' && options?.isMonitorAnalysis === true;
+    const trimmedQuery = isAutomaticAnalysis ? eventOrTerm.trim() : query.trim();
 
     if (!trimmedQuery) {
       setRows([]);
       setSummary(null);
       setMessage('Please enter a search term.');
+
+      if (isAutomaticAnalysis) {
+        setAnalysisStatus('ready');
+      }
+
       return;
+    }
+
+    if (isAutomaticAnalysis) {
+      setAnalysisStatus('analyzing');
     }
 
     setIsSearching(true);
@@ -156,8 +169,41 @@ export default function HomePage() {
       setMessage(error instanceof Error ? error.message : 'Unable to search right now.');
     } finally {
       setIsSearching(false);
+
+      if (isAutomaticAnalysis) {
+        setAnalysisStatus('complete');
+      }
     }
   }
+
+  const analysisStatusBadgeStyles: Record<AnalysisStatus, { background: string; border: string; color: string; label: string }> = {
+    idle: {
+      background: '#f1f5f9',
+      border: '1px solid #cbd5e1',
+      color: '#475569',
+      label: 'No Product',
+    },
+    ready: {
+      background: '#dbeafe',
+      border: '1px solid #93c5fd',
+      color: '#1d4ed8',
+      label: 'READY',
+    },
+    analyzing: {
+      background: '#fef3c7',
+      border: '1px solid #fcd34d',
+      color: '#92400e',
+      label: 'ANALYZING',
+    },
+    complete: {
+      background: '#dcfce7',
+      border: '1px solid #86efac',
+      color: '#166534',
+      label: 'COMPLETE',
+    },
+  };
+
+  const currentAnalysisBadge = analysisStatusBadgeStyles[analysisStatus];
 
   return (
     <main className="page-shell" style={{ gap: '24px' }}>
@@ -320,10 +366,14 @@ export default function HomePage() {
                 onClick={() => {
                   if (card.title === '🔥 Hot Restocks') {
                     card.onClick?.();
+                    setAnalysisStatus('ready');
                     setActiveTab('arbitrage');
-                    void handleSearch('2025 Topps Chrome Baseball Hobby Box');
+                    setAnalysisStatus('analyzing');
+                    void handleSearch('2025 Topps Chrome Baseball Hobby Box', { isMonitorAnalysis: true });
                     return;
                   }
+                  setSelectedProduct(null);
+                  setAnalysisStatus('idle');
                   setActiveTab('arbitrage');
                 }}
                 style={{
@@ -442,9 +492,10 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        {activeTab === 'arbitrage' && selectedProduct ? (
+        {activeTab === 'arbitrage' ? (
           <div
             style={{
+              position: 'relative',
               marginBottom: '16px',
               padding: '18px 20px',
               borderRadius: '16px',
@@ -453,20 +504,39 @@ export default function HomePage() {
               boxShadow: '0 12px 32px rgba(15, 23, 42, 0.2)',
             }}
           >
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                borderRadius: '999px',
+                background: currentAnalysisBadge.background,
+                border: currentAnalysisBadge.border,
+                color: currentAnalysisBadge.color,
+                fontSize: '12px',
+                fontWeight: 700,
+              }}
+            >
+              {currentAnalysisBadge.label}
+            </div>
             <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '8px' }}>
               Focused Opportunity
             </div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: '#f8fafc', marginBottom: '10px' }}>
-              Analyzing: {selectedProduct.title}
+              {selectedProduct ? `Analyzing: ${selectedProduct.title}` : 'No product selected'}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', color: '#e2e8f0', fontSize: '14px' }}>
               <div>
                 <span style={{ color: '#94a3b8', marginRight: '6px' }}>Retailer:</span>
-                <span style={{ fontWeight: 600 }}>{selectedProduct.retailer}</span>
+                <span style={{ fontWeight: 600 }}>{selectedProduct?.retailer ?? '—'}</span>
               </div>
               <div>
                 <span style={{ color: '#94a3b8', marginRight: '6px' }}>Retail Price:</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(selectedProduct.retailPrice)}</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(selectedProduct?.retailPrice)}</span>
               </div>
             </div>
           </div>
@@ -491,19 +561,47 @@ export default function HomePage() {
               <tbody>
                 {rows.map((row) => {
                   const lowestEbayPrice = row.price ?? 0;
+                  const retailPrice = selectedProduct?.retailPrice ?? 0;
+                  const averageEbayPrice = summary?.averagePrice ?? lowestEbayPrice;
+                  const estimatedShipping = 8.95;
                   const opportunity = calculateOpportunity({
-                    retailPrice: 0,
+                    retailPrice,
                     lowestEbayPrice,
-                    averageEbayPrice: summary?.averagePrice ?? lowestEbayPrice,
-                    estimatedShipping: 8.95,
+                    averageEbayPrice,
+                    estimatedShipping,
                     ebayFeePercent: 0.1325,
                   });
-                  const retailPrice = lowestEbayPrice - opportunity.ebayFee - 8.95 - opportunity.netProfit;
                   const confidence = row.matchConfidence ?? 0;
                   const isBuy = confidence >= 80;
                   const isWatch = confidence >= 55;
                   const tone = isBuy ? 'buy' : isWatch ? 'watch' : 'pass';
-                  const recommendation = isBuy ? 'BUY' : isWatch ? 'WATCH' : 'PASS';
+                  const recommendation =
+  opportunity.netProfit < 0
+    ? 'PASS'
+    : opportunity.netProfit < 20
+      ? 'WATCH'
+      : 'BUY';
+
+                  let opportunityScore = 100;
+                  if (opportunity.netProfit < 0) {
+                    opportunityScore -= 40;
+                  }
+                  if (opportunity.roiPercent < 10) {
+                    opportunityScore -= 20;
+                  }
+                  if (confidence < 80) {
+                    opportunityScore -= 15;
+                  }
+                  if (averageEbayPrice < retailPrice) {
+                    opportunityScore -= 10;
+                  }
+                  if (estimatedShipping > 10) {
+                    opportunityScore -= 10;
+                  }
+                  if ((summary?.listingCount ?? 0) < 5) {
+                    opportunityScore -= 5;
+                  }
+                  opportunityScore = Math.max(0, Math.min(100, opportunityScore));
 
                   return (
                     <tr key={row.itemId ?? row.title} style={{ borderTop: '1px solid #e2e8f0' }}>
@@ -514,7 +612,7 @@ export default function HomePage() {
                       <td style={{ padding: '14px', color: '#0f172a' }}>{formatCurrency(summary?.averagePrice ?? lowestEbayPrice)}</td>
                       <td style={{ padding: '14px', color: tone === 'pass' ? '#b91c1c' : '#0f172a' }}>{formatCurrency(opportunity.netProfit)}</td>
                       <td style={{ padding: '14px', color: tone === 'pass' ? '#b91c1c' : '#0f172a' }}>{`${opportunity.roiPercent.toFixed(1)}%`}</td>
-                      <td style={{ padding: '14px', color: '#0f172a' }}>{confidence}</td>
+                      <td style={{ padding: '14px', color: '#0f172a' }}>{opportunityScore}</td>
                       <td style={{ padding: '14px' }}>
                         <span
                           style={{
