@@ -1,5 +1,7 @@
 type RetailerShopRow = {
   retailer: string;
+  productDetailUrl?: string;
+  productSearchUrl?: string;
   price: number;
   availability: string;
   shipping: string;
@@ -37,28 +39,28 @@ export default function RetailerShopPanel({ rows, summary }: RetailerShopPanelPr
           marginBottom: '20px',
         }}
       >
-        <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Retailers</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{summary.retailerCount}</div>
+        <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Retailers</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{summary.retailerCount}</div>
         </div>
-        <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Lowest Price</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(summary.lowestPrice)}</div>
+        <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Lowest Price</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{formatCurrency(summary.lowestPrice)}</div>
         </div>
-        <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Average Price</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(summary.averagePrice)}</div>
+        <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Average Price</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{formatCurrency(summary.averagePrice)}</div>
         </div>
-        <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Highest Price</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(summary.highestPrice)}</div>
+        <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Highest Price</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{formatCurrency(summary.highestPrice)}</div>
         </div>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '680px' }}>
           <thead>
-            <tr style={{ background: '#f8fafc', color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <tr style={{ background: '#111827', color: '#cbd5e1', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               <th style={{ padding: '12px 14px', textAlign: 'left' }}>Retailer</th>
               <th style={{ padding: '12px 14px', textAlign: 'left' }}>Price</th>
               <th style={{ padding: '12px 14px', textAlign: 'left' }}>Availability</th>
@@ -67,19 +69,28 @@ export default function RetailerShopPanel({ rows, summary }: RetailerShopPanelPr
           </thead>
           <tbody>
             {rows.map((row) => {
-              const availabilityColor = row.availability === 'In Stock' ? '#166534' : row.availability === 'Limited' ? '#b45309' : '#991b1b';
-              const availabilityBackground = row.availability === 'In Stock' ? '#dcfce7' : row.availability === 'Limited' ? '#fef3c7' : '#fee2e2';
+              const availabilityColor = row.availability === 'In Stock' ? '#bbf7d0' : row.availability === 'Limited' ? '#fde68a' : '#fecaca';
+              const availabilityBackground = row.availability === 'In Stock' ? 'rgba(34, 197, 94, 0.16)' : row.availability === 'Limited' ? 'rgba(250, 204, 21, 0.16)' : 'rgba(248, 113, 113, 0.16)';
+              const retailerProductUrl = row.productDetailUrl ?? row.productSearchUrl;
 
               return (
                 <tr
                   key={row.retailer}
                   style={{
-                    borderTop: '1px solid #e2e8f0',
-                    background: row.isLowest ? '#f0fdf4' : 'transparent',
+                    borderTop: '1px solid #243347',
+                    background: row.isLowest ? 'rgba(34, 197, 94, 0.08)' : '#0b1220',
                   }}
                 >
-                  <td style={{ padding: '14px', fontWeight: row.isLowest ? 700 : 600, color: '#0f172a' }}>{row.retailer}</td>
-                  <td style={{ padding: '14px', fontWeight: row.isLowest ? 700 : 500, color: row.isLowest ? '#166534' : '#0f172a' }}>{formatCurrency(row.price)}</td>
+                  <td style={{ padding: '14px', fontWeight: row.isLowest ? 700 : 600, color: '#e5e7eb' }}>
+                    {retailerProductUrl ? (
+                      <a href={retailerProductUrl} target="_blank" rel="noopener noreferrer" className="goat-retailer-link">
+                        {row.retailer}
+                      </a>
+                    ) : (
+                      row.retailer
+                    )}
+                  </td>
+                  <td style={{ padding: '14px', fontWeight: row.isLowest ? 700 : 500, color: row.isLowest ? '#86efac' : '#e5e7eb' }}>{formatCurrency(row.price)}</td>
                   <td style={{ padding: '14px' }}>
                     <span
                       style={{
@@ -96,7 +107,7 @@ export default function RetailerShopPanel({ rows, summary }: RetailerShopPanelPr
                       {row.availability}
                     </span>
                   </td>
-                  <td style={{ padding: '14px', color: '#475569' }}>{row.shipping}</td>
+                  <td style={{ padding: '14px', color: '#cbd5e1' }}>{row.shipping}</td>
                 </tr>
               );
             })}

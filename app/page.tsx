@@ -43,6 +43,8 @@ function formatCurrency(value: number | null | undefined) {
 const shopRows = [
   {
     retailer: 'Dave & Adam\'s',
+    productDetailUrl: 'https://www.dacardworld.com/sports-cards/2025-topps-chrome-baseball-hobby-box',
+    productSearchUrl: 'https://www.dacardworld.com/search/?Search=2025%20Topps%20Chrome%20Baseball%20Hobby%20Box',
     price: 409.99,
     availability: 'In Stock',
     shipping: 'Free over $250',
@@ -50,6 +52,8 @@ const shopRows = [
   },
   {
     retailer: 'Blowout Cards',
+    productDetailUrl: 'https://www.blowoutcards.com/2025-topps-chrome-baseball-hobby-box.html',
+    productSearchUrl: 'https://www.blowoutcards.com/catalogsearch/result/?q=2025+Topps+Chrome+Baseball+Hobby+Box',
     price: 389.99,
     availability: 'Limited',
     shipping: '$6.95',
@@ -57,6 +61,7 @@ const shopRows = [
   },
   {
     retailer: 'Steel City Collectibles',
+    productSearchUrl: 'https://www.steelcitycollectibles.com/search?query=2025%20Topps%20Chrome%20Baseball%20Hobby%20Box',
     price: 419.5,
     availability: 'In Stock',
     shipping: '$8.50',
@@ -64,6 +69,7 @@ const shopRows = [
   },
   {
     retailer: 'Midwest Cards',
+    productSearchUrl: 'https://www.midwestcards.com/search?q=2025%20Topps%20Chrome%20Baseball%20Hobby%20Box',
     price: 399.99,
     availability: 'Backorder',
     shipping: '$5.95',
@@ -113,6 +119,10 @@ export default function HomePage() {
     if (eventOrTerm && typeof eventOrTerm === 'object') {
       eventOrTerm.preventDefault();
       eventOrTerm.stopPropagation();
+    }
+
+    if (isSearching) {
+      return;
     }
 
     const isAutomaticAnalysis = typeof eventOrTerm === 'string' && options?.isMonitorAnalysis === true;
@@ -178,32 +188,109 @@ export default function HomePage() {
 
   const analysisStatusBadgeStyles: Record<AnalysisStatus, { background: string; border: string; color: string; label: string }> = {
     idle: {
-      background: '#f1f5f9',
-      border: '1px solid #cbd5e1',
-      color: '#475569',
+      background: '#0b1220',
+      border: '1px solid #334155',
+      color: '#cbd5e1',
       label: 'No Product',
     },
     ready: {
-      background: '#dbeafe',
-      border: '1px solid #93c5fd',
-      color: '#1d4ed8',
+      background: '#0c1f3b',
+      border: '1px solid #2563eb',
+      color: '#93c5fd',
       label: 'READY',
     },
     analyzing: {
-      background: '#fef3c7',
-      border: '1px solid #fcd34d',
-      color: '#92400e',
+      background: '#241a08',
+      border: '1px solid #f59e0b',
+      color: '#fde68a',
       label: 'ANALYZING',
     },
     complete: {
-      background: '#dcfce7',
-      border: '1px solid #86efac',
-      color: '#166534',
+      background: '#052e23',
+      border: '1px solid #10b981',
+      color: '#86efac',
       label: 'COMPLETE',
     },
   };
 
   const currentAnalysisBadge = analysisStatusBadgeStyles[analysisStatus];
+  const selectedRetailPrice = selectedProduct?.retailPrice ?? 0;
+
+  const getOpportunityMetrics = (row: SearchResultRow) => {
+    const lowestEbayPrice = row.price ?? 0;
+    const averageEbayPrice = summary?.averagePrice ?? lowestEbayPrice;
+    const estimatedShipping = 8.95;
+    const opportunity = calculateOpportunity({
+      retailPrice: selectedRetailPrice,
+      lowestEbayPrice,
+      averageEbayPrice,
+      estimatedShipping,
+      ebayFeePercent: 0.1325,
+    });
+    const confidence = row.matchConfidence ?? 0;
+    const isBuy = confidence >= 80;
+    const isWatch = confidence >= 55;
+    const tone = isBuy ? 'buy' : isWatch ? 'watch' : 'pass';
+    const recommendation =
+      opportunity.netProfit < 0
+        ? 'PASS'
+        : opportunity.netProfit < 20
+          ? 'WATCH'
+          : 'BUY';
+
+    let opportunityScore = 100;
+    if (opportunity.netProfit < 0) {
+      opportunityScore -= 40;
+    }
+    if (opportunity.roiPercent < 10) {
+      opportunityScore -= 20;
+    }
+    if (confidence < 80) {
+      opportunityScore -= 15;
+    }
+    if (averageEbayPrice < selectedRetailPrice) {
+      opportunityScore -= 10;
+    }
+    if (estimatedShipping > 10) {
+      opportunityScore -= 10;
+    }
+    if ((summary?.listingCount ?? 0) < 5) {
+      opportunityScore -= 5;
+    }
+    opportunityScore = Math.max(0, Math.min(100, opportunityScore));
+
+    return {
+      lowestEbayPrice,
+      averageEbayPrice,
+      opportunity,
+      tone,
+      recommendation,
+      opportunityScore,
+    };
+  };
+
+  const decisionMetrics = rows.length > 0 ? getOpportunityMetrics(rows[0]) : null;
+  const decisionBulletPoints = decisionMetrics
+    ? [
+        decisionMetrics.opportunity.netProfit < 0
+          ? 'Expected loss after fees and shipping.'
+          : 'Expected profit after fees and shipping.',
+        decisionMetrics.opportunity.roiPercent < 10
+          ? 'ROI is below target.'
+          : decisionMetrics.opportunity.roiPercent >= 25
+            ? 'Excellent ROI.'
+            : 'ROI is within target range.',
+        selectedRetailPrice > decisionMetrics.averageEbayPrice
+          ? 'Retail price exceeds current market average.'
+          : 'Retail price is aligned with market average pricing.',
+        decisionMetrics.recommendation === 'BUY'
+          ? 'Meets GOAT buying criteria.'
+          : decisionMetrics.recommendation === 'WATCH'
+            ? 'Worth monitoring for price changes.'
+            : 'Current pricing does not justify purchase.',
+        `${summary?.listingCount ?? 0} comparable listings are currently reflected in this market scan.`,
+      ]
+    : [];
 
   return (
     <main className="page-shell" style={{ gap: '24px' }}>
@@ -218,7 +305,7 @@ export default function HomePage() {
       <section className="dashboard-card" style={{ padding: '24px' }}>
         <form onSubmit={handleSearch} style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
           <div style={{ width: '100%', maxWidth: '780px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#cbd5e1', fontSize: '14px', fontWeight: 600 }}>
               <span>Category</span>
               <select
                 value={selectedCategory}
@@ -226,12 +313,12 @@ export default function HomePage() {
                 style={{
                   padding: '14px 16px',
                   borderRadius: '999px',
-                  border: '1px solid #475569',
-                  background: '#020617',
-                  color: 'white',
+                  border: '1px solid #334155',
+                  background: '#0b1220',
+                  color: '#f8fafc',
                   fontSize: '15px',
                   outline: 'none',
-                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.12)',
+                  boxShadow: '0 8px 30px rgba(2, 6, 23, 0.28)',
                 }}
               >
                 <option value="Sports Cards">Sports Cards</option>
@@ -262,10 +349,12 @@ export default function HomePage() {
                   flex: 1,
                   padding: '16px 18px',
                   borderRadius: '999px',
-                  border: '1px solid #d7dce5',
+                  border: '1px solid #334155',
+                  background: '#0b1220',
+                  color: '#f8fafc',
                   fontSize: '16px',
                   outline: 'none',
-                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 8px 30px rgba(2, 6, 23, 0.2)',
                 }}
               />
               <button
@@ -275,9 +364,9 @@ export default function HomePage() {
                   minWidth: '120px',
                   padding: '0 18px',
                   borderRadius: '999px',
-                  border: '1px solid #0f172a',
-                  background: isSearching ? '#334155' : '#0f172a',
-                  color: 'white',
+                  border: '1px solid #2563eb',
+                  background: isSearching ? '#334155' : '#2563eb',
+                  color: '#f8fafc',
                   fontWeight: 700,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -306,10 +395,11 @@ export default function HomePage() {
             style={{
               padding: '10px 18px',
               borderRadius: '999px',
-              border: '1px solid #cbd5e1',
-              background: activeTab === 'shop' ? '#0f172a' : 'white',
-              color: activeTab === 'shop' ? 'white' : '#0f172a',
+                border: '1px solid #334155',
+                background: activeTab === 'shop' ? '#1e293b' : '#0b1220',
+                color: activeTab === 'shop' ? '#f8fafc' : '#cbd5e1',
               fontWeight: 600,
+                transition: 'background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease',
             }}
           >
             🛒 Shop
@@ -320,10 +410,11 @@ export default function HomePage() {
             style={{
               padding: '10px 18px',
               borderRadius: '999px',
-              border: '1px solid #cbd5e1',
-              background: activeTab === 'arbitrage' ? '#0f172a' : 'white',
-              color: activeTab === 'arbitrage' ? 'white' : '#0f172a',
+                border: '1px solid #334155',
+                background: activeTab === 'arbitrage' ? '#1e293b' : '#0b1220',
+                color: activeTab === 'arbitrage' ? '#f8fafc' : '#cbd5e1',
               fontWeight: 600,
+                transition: 'background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease',
             }}
           >
             💰 Arbitrage
@@ -334,10 +425,11 @@ export default function HomePage() {
             style={{
               padding: '10px 18px',
               borderRadius: '999px',
-              border: '1px solid #cbd5e1',
-              background: activeTab === 'monitor' ? '#0f172a' : 'white',
-              color: activeTab === 'monitor' ? 'white' : '#0f172a',
+                border: '1px solid #334155',
+                background: activeTab === 'monitor' ? '#1e293b' : '#0b1220',
+                color: activeTab === 'monitor' ? '#f8fafc' : '#cbd5e1',
               fontWeight: 600,
+                transition: 'background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease',
             }}
           >
             📡 Monitor
@@ -377,11 +469,11 @@ export default function HomePage() {
                   setActiveTab('arbitrage');
                 }}
                 style={{
-                  background: '#f8fafc',
+                  background: '#0b1220',
                   borderRadius: '16px',
                   padding: '20px',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)',
+                  border: '1px solid #243347',
+                  boxShadow: '0 10px 28px rgba(2, 6, 23, 0.26)',
                   minHeight: '140px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -393,15 +485,15 @@ export default function HomePage() {
                 }}
                 onMouseEnter={(event) => {
                   event.currentTarget.style.transform = 'translateY(-2px)';
-                  event.currentTarget.style.boxShadow = '0 12px 30px rgba(15, 23, 42, 0.12)';
+                  event.currentTarget.style.boxShadow = '0 14px 32px rgba(2, 6, 23, 0.34)';
                 }}
                 onMouseLeave={(event) => {
                   event.currentTarget.style.transform = 'translateY(0)';
-                  event.currentTarget.style.boxShadow = '0 8px 30px rgba(15, 23, 42, 0.06)';
+                  event.currentTarget.style.boxShadow = '0 10px 28px rgba(2, 6, 23, 0.26)';
                 }}
               >
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>{card.title}</div>
-                <div style={{ fontSize: '14px', color: '#64748b' }}>{card.subtitle}</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>{card.title}</div>
+                <div style={{ fontSize: '14px', color: '#cbd5e1' }}>{card.subtitle}</div>
               </button>
             ))}
           </div>
@@ -414,82 +506,31 @@ export default function HomePage() {
               marginBottom: '20px',
             }}
           >
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Listings</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{summary.listingCount ?? 0}</div>
+            <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Listings</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{summary.listingCount ?? 0}</div>
             </div>
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Lowest Price</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(summary.lowestPrice)}</div>
+            <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Lowest Price</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{formatCurrency(summary.lowestPrice)}</div>
             </div>
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Average Price</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(summary.averagePrice)}</div>
+            <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Average Price</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{formatCurrency(summary.averagePrice)}</div>
             </div>
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>Highest Price</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{formatCurrency(summary.highestPrice)}</div>
+            <div style={{ background: '#0b1220', borderRadius: '12px', padding: '12px 14px', border: '1px solid #243347', boxShadow: '0 8px 20px rgba(2, 6, 23, 0.18)' }}>
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8' }}>Highest Price</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{formatCurrency(summary.highestPrice)}</div>
             </div>
           </div>
         ) : null}
 
         {activeTab === 'arbitrage' && isSearching ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>🔄 Analyzing product...</div>
+          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>🔄 Analyzing product...</div>
         ) : null}
 
         {!isSearching && message && rows.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>{message}</div>
-        ) : null}
-
-        {activeTab === 'shop' ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '680px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Retailer</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Price</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Availability</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Shipping</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shopRows.map((row) => {
-                  const availabilityColor = row.availability === 'In Stock' ? '#166534' : row.availability === 'Limited' ? '#b45309' : '#991b1b';
-                  const availabilityBackground = row.availability === 'In Stock' ? '#dcfce7' : row.availability === 'Limited' ? '#fef3c7' : '#fee2e2';
-
-                  return (
-                    <tr
-                      key={row.retailer}
-                      style={{
-                        borderTop: '1px solid #e2e8f0',
-                        background: row.isLowest ? '#f0fdf4' : 'transparent',
-                      }}
-                    >
-                      <td style={{ padding: '14px', fontWeight: row.isLowest ? 700 : 600, color: '#0f172a' }}>{row.retailer}</td>
-                      <td style={{ padding: '14px', fontWeight: row.isLowest ? 700 : 500, color: row.isLowest ? '#166534' : '#0f172a' }}>{formatCurrency(row.price)}</td>
-                      <td style={{ padding: '14px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '6px 10px',
-                            borderRadius: '999px',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            color: availabilityColor,
-                            background: availabilityBackground,
-                          }}
-                        >
-                          {row.availability}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px', color: '#475569' }}>{row.shipping}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>{message}</div>
         ) : null}
 
         {activeTab === 'arbitrage' ? (
@@ -499,9 +540,9 @@ export default function HomePage() {
               marginBottom: '16px',
               padding: '18px 20px',
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, #0f172a 0%, #111827 100%)',
-              border: '1px solid #334155',
-              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.2)',
+                background: 'linear-gradient(135deg, #0b1220 0%, #111827 100%)',
+                border: '1px solid #243347',
+                boxShadow: '0 16px 40px rgba(2, 6, 23, 0.32)',
             }}
           >
             <div
@@ -542,11 +583,33 @@ export default function HomePage() {
           </div>
         ) : null}
 
+        {activeTab === 'arbitrage' && decisionMetrics ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '16px 18px',
+              borderRadius: '14px',
+                background: '#0b1220',
+                border: '1px solid #243347',
+                boxShadow: '0 10px 28px rgba(2, 6, 23, 0.26)',
+            }}
+          >
+            <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>
+              Decision Summary
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '18px', color: '#e5e7eb', fontSize: '14px', lineHeight: 1.6 }}>
+              {decisionBulletPoints.slice(0, 5).map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {activeTab === 'arbitrage' && !isSearching && rows.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
+            <table className="arbitrage-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <tr style={{ background: '#111827', color: '#e2e8f0', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Product</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Retailer</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Retail Price</th>
@@ -560,59 +623,28 @@ export default function HomePage() {
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const lowestEbayPrice = row.price ?? 0;
-                  const retailPrice = selectedProduct?.retailPrice ?? 0;
-                  const averageEbayPrice = summary?.averagePrice ?? lowestEbayPrice;
-                  const estimatedShipping = 8.95;
-                  const opportunity = calculateOpportunity({
-                    retailPrice,
-                    lowestEbayPrice,
-                    averageEbayPrice,
-                    estimatedShipping,
-                    ebayFeePercent: 0.1325,
-                  });
-                  const confidence = row.matchConfidence ?? 0;
-                  const isBuy = confidence >= 80;
-                  const isWatch = confidence >= 55;
-                  const tone = isBuy ? 'buy' : isWatch ? 'watch' : 'pass';
-                  const recommendation =
-  opportunity.netProfit < 0
-    ? 'PASS'
-    : opportunity.netProfit < 20
-      ? 'WATCH'
-      : 'BUY';
-
-                  let opportunityScore = 100;
-                  if (opportunity.netProfit < 0) {
-                    opportunityScore -= 40;
-                  }
-                  if (opportunity.roiPercent < 10) {
-                    opportunityScore -= 20;
-                  }
-                  if (confidence < 80) {
-                    opportunityScore -= 15;
-                  }
-                  if (averageEbayPrice < retailPrice) {
-                    opportunityScore -= 10;
-                  }
-                  if (estimatedShipping > 10) {
-                    opportunityScore -= 10;
-                  }
-                  if ((summary?.listingCount ?? 0) < 5) {
-                    opportunityScore -= 5;
-                  }
-                  opportunityScore = Math.max(0, Math.min(100, opportunityScore));
+                  const { lowestEbayPrice, opportunity, tone, recommendation, opportunityScore } = getOpportunityMetrics(row);
+                  const profitColor = opportunity.netProfit < 0 ? '#f87171' : opportunity.netProfit > 0 ? '#4ade80' : '#e5e7eb';
+                  const roiColor = opportunity.roiPercent < 0 ? '#f87171' : opportunity.roiPercent > 0 ? '#4ade80' : '#e5e7eb';
 
                   return (
-                    <tr key={row.itemId ?? row.title} style={{ borderTop: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '14px', fontWeight: 600, color: '#0f172a' }}>{row.title}</td>
-                      <td style={{ padding: '14px', color: '#475569' }}>{row.sellerUsername ?? 'eBay Seller'}</td>
-                      <td style={{ padding: '14px', color: '#0f172a' }}>{formatCurrency(retailPrice)}</td>
-                      <td style={{ padding: '14px', color: '#0f172a' }}>{formatCurrency(lowestEbayPrice)}</td>
-                      <td style={{ padding: '14px', color: '#0f172a' }}>{formatCurrency(summary?.averagePrice ?? lowestEbayPrice)}</td>
-                      <td style={{ padding: '14px', color: tone === 'pass' ? '#b91c1c' : '#0f172a' }}>{formatCurrency(opportunity.netProfit)}</td>
-                      <td style={{ padding: '14px', color: tone === 'pass' ? '#b91c1c' : '#0f172a' }}>{`${opportunity.roiPercent.toFixed(1)}%`}</td>
-                      <td style={{ padding: '14px', color: '#0f172a' }}>{opportunityScore}</td>
+                    <tr key={row.itemId ?? row.title} className="arbitrage-row" style={{ borderTop: '1px solid #243347' }}>
+                      <td style={{ padding: '14px', fontWeight: 600, color: '#e5e7eb' }}>{row.title}</td>
+                      <td style={{ padding: '14px', color: '#cbd5e1' }}>
+                        {row.itemWebUrl ? (
+                          <a href={row.itemWebUrl} target="_blank" rel="noopener noreferrer" className="goat-retailer-link">
+                            {row.sellerUsername ?? 'eBay Seller'}
+                          </a>
+                        ) : (
+                          row.sellerUsername ?? 'eBay Seller'
+                        )}
+                      </td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(selectedRetailPrice)}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(lowestEbayPrice)}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(summary?.averagePrice ?? lowestEbayPrice)}</td>
+                      <td style={{ padding: '14px', color: profitColor, fontWeight: 700 }}>{formatCurrency(opportunity.netProfit)}</td>
+                      <td style={{ padding: '14px', color: roiColor, fontWeight: 700 }}>{`${opportunity.roiPercent.toFixed(1)}%`}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{opportunityScore}</td>
                       <td style={{ padding: '14px' }}>
                         <span
                           style={{
@@ -622,8 +654,8 @@ export default function HomePage() {
                             borderRadius: '999px',
                             fontWeight: 700,
                             fontSize: '13px',
-                            background: tone === 'buy' ? '#dcfce7' : tone === 'watch' ? '#fef3c7' : '#fee2e2',
-                            color: tone === 'buy' ? '#166534' : tone === 'watch' ? '#92400e' : '#991b1b',
+                            background: tone === 'buy' ? 'rgba(34, 197, 94, 0.18)' : tone === 'watch' ? 'rgba(250, 204, 21, 0.18)' : 'rgba(248, 113, 113, 0.18)',
+                            color: tone === 'buy' ? '#bbf7d0' : tone === 'watch' ? '#fde68a' : '#fecaca',
                           }}
                         >
                           {recommendation}
