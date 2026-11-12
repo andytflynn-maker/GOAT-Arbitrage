@@ -147,6 +147,9 @@ function calculateMatchConfidence(
 }
 
 function isSealedSportsCardCandidate(requested: ReturnType<typeof normalizeProductTitle>, candidate: ReturnType<typeof normalizeProductTitle>): boolean {
+  const requestedVariantSignature = [...requested.variants].sort().join('|');
+  const candidateVariantSignature = [...candidate.variants].sort().join('|');
+
   if (requested.year && candidate.year && candidate.year !== requested.year) {
     return false;
   }
@@ -155,7 +158,7 @@ function isSealedSportsCardCandidate(requested: ReturnType<typeof normalizeProdu
     return false;
   }
 
-  if (requested.productType && candidate.productType && candidate.productType !== requested.productType) {
+  if (requested.productType && candidate.productType !== requested.productType) {
     return false;
   }
 
@@ -165,23 +168,7 @@ function isSealedSportsCardCandidate(requested: ReturnType<typeof normalizeProdu
     }
   }
 
-  if (requested.variants.length > 0) {
-    const hasMatchingVariant = requested.variants.some((variant) => candidate.variants.includes(variant));
-    if (!hasMatchingVariant) {
-      return false;
-    }
-  } else if (candidate.variants.some((variant) => [
-    'black',
-    'sapphire',
-    'cosmic',
-    'update',
-    'logofractor',
-    'sonic',
-    'lite',
-    'jumbo',
-    'breaker delight',
-    'fanatics fest',
-  ].includes(variant))) {
+  if (requestedVariantSignature !== candidateVariantSignature) {
     return false;
   }
 

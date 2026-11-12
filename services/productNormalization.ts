@@ -31,6 +31,7 @@ const PRODUCT_TYPE_PATTERNS = [
 ];
 
 const VARIANT_PATTERNS = [
+  'platinum',
   'black',
   'sapphire',
   'cosmic',

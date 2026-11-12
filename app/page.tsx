@@ -2,7 +2,10 @@
 
 import { FormEvent, useState } from 'react';
 import RetailerShopPanel from '@/components/RetailerShopPanel';
+import MarketTrendModule, { type MarketTrendSnapshot } from '@/components/MarketTrendModule';
 import { calculateOpportunity } from '@/services/profitEngine';
+import { normalizeProductTitle } from '@/services/productNormalization';
+import { matchProducts } from '@/services/productMatchEngine';
 
 type SearchResultRow = {
   itemId?: string | null;
@@ -140,6 +143,16 @@ export default function HomePage() {
       return;
     }
 
+    if (!selectedProduct) {
+      const defaultRetailerRow = shopRows.find((row) => row.isLowest) ?? shopRows[0];
+      setSelectedProduct({
+        title: trimmedQuery,
+        category: selectedCategory,
+        retailer: defaultRetailerRow.retailer,
+        retailPrice: defaultRetailerRow.price,
+      });
+    }
+
     if (isAutomaticAnalysis) {
       setAnalysisStatus('analyzing');
     }
@@ -214,14 +227,13 @@ export default function HomePage() {
   };
 
   const currentAnalysisBadge = analysisStatusBadgeStyles[analysisStatus];
-  const selectedRetailPrice = selectedProduct?.retailPrice ?? 0;
 
-  const getOpportunityMetrics = (row: SearchResultRow) => {
+  const getOpportunityMetrics = (row: SearchResultRow, retailPrice: number) => {
     const lowestEbayPrice = row.price ?? 0;
     const averageEbayPrice = summary?.averagePrice ?? lowestEbayPrice;
     const estimatedShipping = 8.95;
     const opportunity = calculateOpportunity({
-      retailPrice: selectedRetailPrice,
+      retailPrice,
       lowestEbayPrice,
       averageEbayPrice,
       estimatedShipping,
@@ -248,7 +260,7 @@ export default function HomePage() {
     if (confidence < 80) {
       opportunityScore -= 15;
     }
-    if (averageEbayPrice < selectedRetailPrice) {
+    if (averageEbayPrice < retailPrice) {
       opportunityScore -= 10;
     }
     if (estimatedShipping > 10) {
@@ -262,6 +274,8 @@ export default function HomePage() {
     return {
       lowestEbayPrice,
       averageEbayPrice,
+      estimatedShipping,
+      retailPrice,
       opportunity,
       tone,
       recommendation,
@@ -269,28 +283,139 @@ export default function HomePage() {
     };
   };
 
-  const decisionMetrics = rows.length > 0 ? getOpportunityMetrics(rows[0]) : null;
+  const comparisonRowForArbitrage = rows[0]
+    ? {
+        ...rows[0],
+        price: summary?.lowestPrice ?? rows[0].price ?? null,
+      }
+    : null;
+  const sourceNormalizedProduct = selectedProduct ? normalizeProductTitle(selectedProduct.title) : null;
+  const candidateNormalizedProduct = comparisonRowForArbitrage?.title ? normalizeProductTitle(comparisonRowForArbitrage.title) : null;
+  const productMatchResult = selectedProduct && comparisonRowForArbitrage && sourceNormalizedProduct && candidateNormalizedProduct
+    ? matchProducts(
+        {
+          title: selectedProduct.title,
+          year: sourceNormalizedProduct.year,
+          brand: sourceNormalizedProduct.brand,
+          productLine: sourceNormalizedProduct.productLine,
+          productVariant: sourceNormalizedProduct.variants,
+          configuration: sourceNormalizedProduct.productType,
+        },
+        {
+          title: comparisonRowForArbitrage.title,
+          year: candidateNormalizedProduct.year,
+          brand: candidateNormalizedProduct.brand,
+          productLine: candidateNormalizedProduct.productLine,
+          productVariant: candidateNormalizedProduct.variants,
+          configuration: candidateNormalizedProduct.productType,
+        },
+      )
+    : null;
+  const isProductMatchRejected = productMatchResult?.recommendation === 'REJECT';
+  const isProductMatchReview = productMatchResult?.recommendation === 'REVIEW';
+  const productMatchExplanation = (() => {
+    if (!productMatchResult) {
+      return 'Run a search to compare retailer and marketplace identity before arbitrage calculations.';
+    }
+
+    if (isProductMatchRejected) {
+      if (productMatchResult.mismatchedFields.length > 0) {
+        return `Arbitrage is blocked because product identity conflicts were detected in: ${productMatchResult.mismatchedFields.join(', ')}.`;
+      }
+
+      if (productMatchResult.excludedKeywords.length > 0) {
+        return `Arbitrage is blocked because excluded identity keywords were detected: ${productMatchResult.excludedKeywords.join(', ')}.`;
+      }
+
+      return 'Arbitrage is blocked because the product match engine rejected this pairing.';
+    }
+
+    if (isProductMatchReview) {
+      return 'Identity is close but requires manual review before purchase execution.';
+    }
+
+    return 'Identity alignment passed strict checks. Arbitrage calculations are safe to proceed.';
+  })();
+  const arbitrageRowsWithMetrics = selectedProduct && comparisonRowForArbitrage && !isProductMatchRejected
+    ? shopRows.map((row) => ({
+        row,
+        rowKey: row.retailer,
+        metrics: getOpportunityMetrics(comparisonRowForArbitrage, row.price),
+      }))
+    : [];
+  const sortedArbitrageRowsWithMetrics = [...arbitrageRowsWithMetrics].sort((left, right) => {
+    const profitDelta = right.metrics.opportunity.netProfit - left.metrics.opportunity.netProfit;
+    if (profitDelta !== 0) {
+      return profitDelta;
+    }
+
+    return right.metrics.opportunity.roiPercent - left.metrics.opportunity.roiPercent;
+  });
+  const selectedArbitrageEntry = sortedArbitrageRowsWithMetrics[0] ?? null;
+  const selectedOpportunityRow = selectedArbitrageEntry?.row ?? null;
+  const decisionMetrics = selectedArbitrageEntry?.metrics ?? null;
+  const bestOpportunityRowKey = sortedArbitrageRowsWithMetrics[0]?.rowKey ?? null;
+  const focusedOpportunityTitle = (() => {
+    const rawTitle = selectedProduct?.title ?? '';
+    const retailerSuffix = selectedProduct?.retailer?.trim();
+    const conditionOnlyPattern = /^(brand\s+new|new|factory\s+sealed)$/i;
+    const marketingPhrasePattern = /(free\s*shipping|free\s*ship|ships?\s+free|fast\s+shipping|limited\s+time|hot\s+deal|best\s+offer)/i;
+
+    if (!rawTitle) {
+      return rawTitle;
+    }
+
+    const escapedRetailer = retailerSuffix?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const titleWithoutRetailerSuffix = escapedRetailer
+      ? rawTitle.replace(new RegExp(`\\s*[-|:]?\\s*${escapedRetailer}\\s*$`, 'i'), '').trim()
+      : rawTitle.trim();
+    const segments = titleWithoutRetailerSuffix.split(/\s*[-|:]\s*/);
+    const productSegments: string[] = [];
+
+    for (const segment of segments) {
+      const trimmedSegment = segment.trim();
+      if (conditionOnlyPattern.test(trimmedSegment) || marketingPhrasePattern.test(trimmedSegment)) {
+        break;
+      }
+      productSegments.push(segment);
+    }
+
+    const cleanedTitle = (productSegments.length > 0 ? productSegments.join(' - ') : titleWithoutRetailerSuffix)
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    return cleanedTitle || titleWithoutRetailerSuffix || rawTitle;
+  })();
   const decisionBulletPoints = decisionMetrics
     ? [
+        (() => {
+          const marketDelta = Number((decisionMetrics.retailPrice - decisionMetrics.averageEbayPrice).toFixed(2));
+          if (marketDelta > 0) {
+            return `Retail price is ${formatCurrency(Math.abs(marketDelta))} above the market average.`;
+          }
+          if (marketDelta < 0) {
+            return `Retail price is ${formatCurrency(Math.abs(marketDelta))} below the market average.`;
+          }
+          return 'Retail price is aligned with the market average.';
+        })(),
         decisionMetrics.opportunity.netProfit < 0
-          ? 'Expected loss after fees and shipping.'
-          : 'Expected profit after fees and shipping.',
-        decisionMetrics.opportunity.roiPercent < 10
-          ? 'ROI is below target.'
-          : decisionMetrics.opportunity.roiPercent >= 25
-            ? 'Excellent ROI.'
-            : 'ROI is within target range.',
-        selectedRetailPrice > decisionMetrics.averageEbayPrice
-          ? 'Retail price exceeds current market average.'
-          : 'Retail price is aligned with market average pricing.',
-        decisionMetrics.recommendation === 'BUY'
-          ? 'Meets GOAT buying criteria.'
-          : decisionMetrics.recommendation === 'WATCH'
-            ? 'Worth monitoring for price changes.'
-            : 'Current pricing does not justify purchase.',
+          ? `Expected loss after fees and shipping is ${formatCurrency(Math.abs(decisionMetrics.opportunity.netProfit))}.`
+          : `Expected profit after fees and shipping is ${formatCurrency(decisionMetrics.opportunity.netProfit)}.`,
+        `ROI is ${decisionMetrics.opportunity.roiPercent.toFixed(1)}%.`,
+        `Estimated eBay fees are ${formatCurrency(decisionMetrics.opportunity.ebayFee)} with ${formatCurrency(decisionMetrics.estimatedShipping)} shipping assumed.`,
+        `Based on these metrics GOAT recommends ${decisionMetrics.recommendation}.`,
         `${summary?.listingCount ?? 0} comparable listings are currently reflected in this market scan.`,
       ]
     : [];
+
+  const marketTrendSnapshot: MarketTrendSnapshot = {
+    sevenDayAverageSoldPrice: null,
+    thirtyDayAverageSoldPrice: null,
+    trendDirection: null,
+    percentChange: null,
+    trendLabel: null,
+    sourceLabel: 'Placeholder (historical eBay data coming soon)',
+  };
 
   return (
     <main className="page-shell" style={{ gap: '24px' }}>
@@ -568,18 +693,122 @@ export default function HomePage() {
               Focused Opportunity
             </div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: '#f8fafc', marginBottom: '10px' }}>
-              {selectedProduct ? `Analyzing: ${selectedProduct.title}` : 'No product selected'}
+              {selectedProduct ? `Analyzing: ${focusedOpportunityTitle}` : 'No product selected'}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', color: '#e2e8f0', fontSize: '14px' }}>
               <div>
-                <span style={{ color: '#94a3b8', marginRight: '6px' }}>Retailer:</span>
-                <span style={{ fontWeight: 600 }}>{selectedProduct?.retailer ?? '—'}</span>
+                <span style={{ color: '#94a3b8', marginRight: '6px' }}>Buy From:</span>
+                <span style={{ fontWeight: 600 }}>{selectedOpportunityRow?.retailer ?? selectedProduct?.retailer ?? '—'}</span>
               </div>
               <div>
                 <span style={{ color: '#94a3b8', marginRight: '6px' }}>Retail Price:</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(selectedProduct?.retailPrice)}</span>
+                <span style={{ fontWeight: 600 }}>{decisionMetrics ? formatCurrency(decisionMetrics.retailPrice) : formatCurrency(selectedProduct?.retailPrice)}</span>
+              </div>
+              <div>
+                <span style={{ color: '#94a3b8', marginRight: '6px' }}>Best eBay Comparison:</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(decisionMetrics?.averageEbayPrice)}</span>
+              </div>
+              <div>
+                <span style={{ color: '#94a3b8', marginRight: '6px' }}>Expected eBay Sale Price:</span>
+                <span style={{ fontWeight: 600 }}>{decisionMetrics ? formatCurrency(decisionMetrics.averageEbayPrice) : '—'}</span>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'arbitrage' ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '16px 18px',
+              borderRadius: '14px',
+              background: '#0b1220',
+              border: '1px solid #243347',
+              boxShadow: '0 10px 28px rgba(2, 6, 23, 0.26)',
+            }}
+          >
+            <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '12px' }}>
+              Product Match
+            </div>
+            {productMatchResult ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px 16px', fontSize: '14px', color: '#e5e7eb', marginBottom: '12px' }}>
+                  <div><span style={{ color: '#94a3b8' }}>Confidence:</span> {`${productMatchResult.confidenceScore}%`}</div>
+                  <div>
+                    <span style={{ color: '#94a3b8' }}>Recommendation:</span>{' '}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        borderRadius: '999px',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        background:
+                          productMatchResult.recommendation === 'AUTO_MATCH'
+                            ? 'rgba(34, 197, 94, 0.18)'
+                            : productMatchResult.recommendation === 'REVIEW'
+                              ? 'rgba(250, 204, 21, 0.18)'
+                              : 'rgba(248, 113, 113, 0.18)',
+                        color:
+                          productMatchResult.recommendation === 'AUTO_MATCH'
+                            ? '#bbf7d0'
+                            : productMatchResult.recommendation === 'REVIEW'
+                              ? '#fde68a'
+                              : '#fecaca',
+                      }}
+                    >
+                      {productMatchResult.recommendation}
+                    </span>
+                  </div>
+                  <div><span style={{ color: '#94a3b8' }}>Matched Fields:</span> {productMatchResult.matchedFields.length > 0 ? productMatchResult.matchedFields.join(', ') : 'None'}</div>
+                  <div><span style={{ color: '#94a3b8' }}>Mismatched Fields:</span> {productMatchResult.mismatchedFields.length > 0 ? productMatchResult.mismatchedFields.join(', ') : 'None'}</div>
+                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#94a3b8' }}>Excluded Identity Keywords:</span> {productMatchResult.excludedKeywords.length > 0 ? productMatchResult.excludedKeywords.join(', ') : 'None'}</div>
+                </div>
+                <div style={{ color: '#cbd5e1', fontSize: '14px' }}>{productMatchExplanation}</div>
+              </>
+            ) : (
+              <div style={{ color: '#cbd5e1', fontSize: '14px' }}>
+                Awaiting product comparison data.
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {activeTab === 'arbitrage' && isProductMatchReview ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              background: 'rgba(250, 204, 21, 0.12)',
+              border: '1px solid rgba(250, 204, 21, 0.45)',
+              color: '#fde68a',
+              fontWeight: 600,
+            }}
+          >
+            Review product match before purchasing.
+          </div>
+        ) : null}
+
+        {activeTab === 'arbitrage' && isProductMatchRejected ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              background: 'rgba(248, 113, 113, 0.12)',
+              border: '1px solid rgba(248, 113, 113, 0.45)',
+              color: '#fecaca',
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: '6px' }}>Product match rejected.</div>
+            <div style={{ fontSize: '14px', marginBottom: '6px' }}>
+              {productMatchResult?.mismatchedFields.length
+                ? `Mismatched fields: ${productMatchResult.mismatchedFields.join(', ')}.`
+                : 'No arbitrage calculation will run for this match.'}
+            </div>
+            <div style={{ fontSize: '14px' }}>{productMatchExplanation}</div>
           </div>
         ) : null}
 
@@ -605,61 +834,212 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        {activeTab === 'arbitrage' && !isSearching && rows.length > 0 ? (
+        {activeTab === 'arbitrage' && decisionMetrics ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '16px 18px',
+              borderRadius: '14px',
+                background: '#0b1220',
+                border: '1px solid #243347',
+                boxShadow: '0 10px 28px rgba(2, 6, 23, 0.26)',
+            }}
+          >
+            <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '12px' }}>
+              Profit Breakdown
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '10px 16px',
+                fontSize: '14px',
+                color: '#e5e7eb',
+              }}
+            >
+              <div><span style={{ color: '#94a3b8' }}>Retail Price:</span> {formatCurrency(decisionMetrics.retailPrice)}</div>
+              <div><span style={{ color: '#94a3b8' }}>Expected eBay Sale Price:</span> {formatCurrency(decisionMetrics.averageEbayPrice)}</div>
+              <div><span style={{ color: '#94a3b8' }}>eBay Fees:</span> {formatCurrency(decisionMetrics.opportunity.ebayFee)}</div>
+              <div><span style={{ color: '#94a3b8' }}>Estimated Shipping:</span> {formatCurrency(decisionMetrics.estimatedShipping)}</div>
+              <div>
+                <span style={{ color: '#94a3b8' }}>Net Profit:</span>{' '}
+                <span style={{ color: decisionMetrics.opportunity.netProfit < 0 ? '#f87171' : decisionMetrics.opportunity.netProfit > 0 ? '#4ade80' : '#e5e7eb', fontWeight: 700 }}>
+                  {formatCurrency(decisionMetrics.opportunity.netProfit)}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: '#94a3b8' }}>ROI:</span>{' '}
+                <span style={{ color: decisionMetrics.opportunity.roiPercent < 0 ? '#f87171' : decisionMetrics.opportunity.roiPercent > 0 ? '#4ade80' : '#e5e7eb', fontWeight: 700 }}>
+                  {`${decisionMetrics.opportunity.roiPercent.toFixed(1)}%`}
+                </span>
+              </div>
+              <div><span style={{ color: '#94a3b8' }}>Recommendation:</span> {decisionMetrics.recommendation}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'arbitrage' && decisionMetrics ? (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '16px 18px',
+              borderRadius: '14px',
+              background: '#0b1220',
+              border: '1px solid #243347',
+              boxShadow: '0 10px 28px rgba(2, 6, 23, 0.26)',
+            }}
+          >
+            <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '12px' }}>
+              Market Demand
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '10px 16px',
+                fontSize: '14px',
+                color: '#e5e7eb',
+              }}
+            >
+              <div><span style={{ color: '#94a3b8' }}>30-Day Sales:</span> 124 (Coming Soon)</div>
+              <div><span style={{ color: '#94a3b8' }}>Active Listings:</span> {summary?.listingCount ?? '57 (Coming Soon)'}</div>
+              <div><span style={{ color: '#94a3b8' }}>Sell-Through Rate:</span> 68% (Coming Soon)</div>
+              <div><span style={{ color: '#94a3b8' }}>Average Days to Sell:</span> 6.3 days (Coming Soon)</div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <MarketTrendModule data={marketTrendSnapshot} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'arbitrage' && !isSearching && selectedProduct && sortedArbitrageRowsWithMetrics.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
             <table className="arbitrage-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
               <thead>
                 <tr style={{ background: '#111827', color: '#e2e8f0', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Product</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Retailer</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Retail Price</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Lowest eBay</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Average eBay</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Profit</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>eBay Avg/Sold Comp</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>eBay Fees</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Shipping</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Net Profit</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>ROI</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Score</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left' }}>Recommendation</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left' }}>Buy</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
-                  const { lowestEbayPrice, opportunity, tone, recommendation, opportunityScore } = getOpportunityMetrics(row);
-                  const profitColor = opportunity.netProfit < 0 ? '#f87171' : opportunity.netProfit > 0 ? '#4ade80' : '#e5e7eb';
-                  const roiColor = opportunity.roiPercent < 0 ? '#f87171' : opportunity.roiPercent > 0 ? '#4ade80' : '#e5e7eb';
+                {sortedArbitrageRowsWithMetrics.map(({ row, rowKey, metrics }) => {
+                  const isBestOpportunity = bestOpportunityRowKey === rowKey;
+                  const retailerUrl = row.productDetailUrl ?? row.productSearchUrl;
+                  const profitColor = metrics.opportunity.netProfit < 0 ? '#f87171' : metrics.opportunity.netProfit > 0 ? '#4ade80' : '#e5e7eb';
+                  const roiColor = metrics.opportunity.roiPercent < 0 ? '#f87171' : metrics.opportunity.roiPercent > 0 ? '#4ade80' : '#e5e7eb';
 
                   return (
-                    <tr key={row.itemId ?? row.title} className="arbitrage-row" style={{ borderTop: '1px solid #243347' }}>
-                      <td style={{ padding: '14px', fontWeight: 600, color: '#e5e7eb' }}>{row.title}</td>
+                    <tr
+                      key={rowKey}
+                      className="arbitrage-row"
+                      style={{
+                        borderTop: '1px solid #243347',
+                        background: isBestOpportunity ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+                        outline: isBestOpportunity ? '1px solid rgba(74, 222, 128, 0.45)' : 'none',
+                        outlineOffset: '-1px',
+                      }}
+                    >
                       <td style={{ padding: '14px', color: '#cbd5e1' }}>
-                        {row.itemWebUrl ? (
-                          <a href={row.itemWebUrl} target="_blank" rel="noopener noreferrer" className="goat-retailer-link">
-                            {row.sellerUsername ?? 'eBay Seller'}
+                        {retailerUrl ? (
+                          <a href={retailerUrl} target="_blank" rel="noopener noreferrer" className="goat-retailer-link">
+                            {row.retailer}
+                          </a>
+                        ) : row.retailer}
+                      </td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(metrics.retailPrice)}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(metrics.averageEbayPrice)}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(metrics.opportunity.ebayFee)}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(metrics.estimatedShipping)}</td>
+                      <td style={{ padding: '14px', color: profitColor, fontWeight: 700 }}>{formatCurrency(metrics.opportunity.netProfit)}</td>
+                      <td style={{ padding: '14px', color: roiColor, fontWeight: 700 }}>{`${metrics.opportunity.roiPercent.toFixed(1)}%`}</td>
+                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{metrics.opportunityScore}</td>
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {isBestOpportunity ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '4px 8px',
+                                borderRadius: '999px',
+                                fontWeight: 700,
+                                fontSize: '11px',
+                                background: 'rgba(34, 197, 94, 0.18)',
+                                color: '#bbf7d0',
+                                border: '1px solid rgba(74, 222, 128, 0.45)',
+                              }}
+                            >
+                              ⭐ Best Opportunity
+                            </span>
+                          ) : null}
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '6px 10px',
+                              borderRadius: '999px',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              background: metrics.tone === 'buy' ? 'rgba(34, 197, 94, 0.18)' : metrics.tone === 'watch' ? 'rgba(250, 204, 21, 0.18)' : 'rgba(248, 113, 113, 0.18)',
+                              color: metrics.tone === 'buy' ? '#bbf7d0' : metrics.tone === 'watch' ? '#fde68a' : '#fecaca',
+                            }}
+                          >
+                            {metrics.recommendation}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px' }}>
+                        {retailerUrl ? (
+                          <a
+                            href={retailerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '6px 10px',
+                              borderRadius: '999px',
+                              border: '1px solid #2563eb',
+                              background: '#1d4ed8',
+                              color: '#f8fafc',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              textDecoration: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            🛒 Buy
                           </a>
                         ) : (
-                          row.sellerUsername ?? 'eBay Seller'
+                          <button
+                            type="button"
+                            disabled
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '6px 10px',
+                              borderRadius: '999px',
+                              border: '1px solid #334155',
+                              background: '#1e293b',
+                              color: '#94a3b8',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              cursor: 'not-allowed',
+                            }}
+                          >
+                            Unavailable
+                          </button>
                         )}
-                      </td>
-                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(selectedRetailPrice)}</td>
-                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(lowestEbayPrice)}</td>
-                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{formatCurrency(summary?.averagePrice ?? lowestEbayPrice)}</td>
-                      <td style={{ padding: '14px', color: profitColor, fontWeight: 700 }}>{formatCurrency(opportunity.netProfit)}</td>
-                      <td style={{ padding: '14px', color: roiColor, fontWeight: 700 }}>{`${opportunity.roiPercent.toFixed(1)}%`}</td>
-                      <td style={{ padding: '14px', color: '#e5e7eb' }}>{opportunityScore}</td>
-                      <td style={{ padding: '14px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '6px 10px',
-                            borderRadius: '999px',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            background: tone === 'buy' ? 'rgba(34, 197, 94, 0.18)' : tone === 'watch' ? 'rgba(250, 204, 21, 0.18)' : 'rgba(248, 113, 113, 0.18)',
-                            color: tone === 'buy' ? '#bbf7d0' : tone === 'watch' ? '#fde68a' : '#fecaca',
-                          }}
-                        >
-                          {recommendation}
-                        </span>
                       </td>
                     </tr>
                   );
