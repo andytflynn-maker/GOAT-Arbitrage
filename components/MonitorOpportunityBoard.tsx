@@ -28,8 +28,8 @@ const sortOptions: Array<{ value: OpportunityFeedSortBy; label: string }> = [
   { value: 'highest-profit', label: 'Highest Profit' },
 ];
 
-function formatCurrency(value: number) {
-  return `$${value.toFixed(2)}`;
+function formatCurrency(value: number | null) {
+  return value === null ? '—' : `$${value.toFixed(2)}`;
 }
 
 function formatDetectedAt(value: string) {
@@ -51,7 +51,8 @@ function getOpportunityBadge(opportunity: Opportunity) {
   if (opportunity.opportunityType === 'restock') {
     return 'Restock';
   }
-  if (opportunity.netProfit > 0 && opportunity.roi >= 10) {
+  if (opportunity.netProfit !== null && opportunity.roi !== null
+    && opportunity.netProfit > 0 && opportunity.roi >= 10) {
     return 'Hot Opportunity';
   }
 
@@ -125,8 +126,8 @@ export default function MonitorOpportunityBoard({ opportunities }: MonitorOpport
         {visibleRows.map((opportunity) => {
           const badge = getOpportunityBadge(opportunity);
           const imageUrl = opportunity.productImage ?? '/placeholder-product.png';
-          const roiTone = opportunity.roi >= 0 ? '#4ade80' : '#f87171';
-          const profitTone = opportunity.netProfit >= 0 ? '#4ade80' : '#f87171';
+          const roiTone = opportunity.roi === null ? '#94a3b8' : opportunity.roi >= 0 ? '#4ade80' : '#f87171';
+          const profitTone = opportunity.netProfit === null ? '#94a3b8' : opportunity.netProfit >= 0 ? '#4ade80' : '#f87171';
 
           return (
             <article
@@ -163,8 +164,8 @@ export default function MonitorOpportunityBoard({ opportunities }: MonitorOpport
                 <div><span style={{ color: '#94a3b8' }}>Current:</span> <span style={{ color: '#e5e7eb' }}>{formatCurrency(opportunity.currentPrice)}</span></div>
                 <div><span style={{ color: '#94a3b8' }}>Market:</span> <span style={{ color: '#e5e7eb' }}>{formatCurrency(opportunity.estimatedMarketPrice)}</span></div>
                 <div><span style={{ color: '#94a3b8' }}>Net:</span> <span style={{ color: profitTone, fontWeight: 700 }}>{formatCurrency(opportunity.netProfit)}</span></div>
-                <div><span style={{ color: '#94a3b8' }}>ROI:</span> <span style={{ color: roiTone, fontWeight: 700 }}>{`${opportunity.roi.toFixed(1)}%`}</span></div>
-                <div><span style={{ color: '#94a3b8' }}>Confidence:</span> <span style={{ color: '#e5e7eb' }}>{opportunity.confidenceScore}</span></div>
+                <div><span style={{ color: '#94a3b8' }}>ROI:</span> <span style={{ color: roiTone, fontWeight: 700 }}>{opportunity.roi === null ? '—' : `${opportunity.roi.toFixed(1)}%`}</span></div>
+                <div><span style={{ color: '#94a3b8' }}>Confidence:</span> <span style={{ color: '#e5e7eb' }}>{opportunity.confidenceScore ?? '—'}</span></div>
                 <div><span style={{ color: '#94a3b8' }}>Detected:</span> <span style={{ color: '#e5e7eb' }}>{formatDetectedAt(opportunity.detectedAt)}</span></div>
               </div>
 

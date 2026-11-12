@@ -112,7 +112,7 @@ function normalizeVariant(value: string | string[] | null | undefined): string[]
     .map((part) => normalizeText(part))
     .filter((part): part is string => Boolean(part));
 
-  return [...new Set(normalized)].sort();
+  return Array.from(new Set(normalized)).sort();
 }
 
 function extractIdentityVariantsFromTitle(title: string | null | undefined): string[] {
@@ -125,7 +125,7 @@ function extractIdentityVariantsFromTitle(title: string | null | undefined): str
 }
 
 function mergeVariantSources(primary: string[], fromTitle: string[]): string[] {
-  return [...new Set([...primary, ...fromTitle])].sort();
+  return Array.from(new Set([...primary, ...fromTitle])).sort();
 }
 
 function parseExcludedKeywords(title: string | null | undefined): string[] {

@@ -5,7 +5,7 @@ import { registeredRetailers } from '@/marketplaces/registry';
 import { buildMockRetailerHealthRecords, buildRetailerHealthSummary } from '@/data/mockRetailerHealth';
 import RetailerHealthCard from '@/components/admin/RetailerHealthCard';
 import RetailerHealthSummaryCards from '@/components/admin/RetailerHealthSummaryCards';
-import type { RetailerHealthRecord, RetailerHealthStatus } from '@/types/retailerHealth';
+import type { RetailerHealthLogEntry, RetailerHealthRecord, RetailerHealthStatus } from '@/types/retailerHealth';
 
 function statusFromMetrics(record: RetailerHealthRecord): RetailerHealthStatus {
   if (record.disabled) {
@@ -32,6 +32,16 @@ function nextMockScanDelta(record: RetailerHealthRecord): RetailerHealthRecord {
 
   const previousAverage = record.metrics.averageScanDurationMs ?? simulatedDurationMs;
   const nextAverage = Math.round((previousAverage + simulatedDurationMs) / 2);
+  const logLevel: RetailerHealthLogEntry['level'] = scanSucceeded ? 'info' : 'error';
+  const scanLog: RetailerHealthLogEntry = {
+    id: `${record.retailerId}-${Date.now()}`,
+    timestamp: nowIso,
+    level: logLevel,
+    source: 'demo',
+    message: scanSucceeded
+      ? `[DEMO] Demo scan completed. Found ${productsFound} products and ${opportunitiesFound} opportunities.`
+      : '[DEMO] Demo scan failed due to simulated timeout.',
+  };
 
   const nextMetrics = {
     ...record.metrics,
@@ -55,18 +65,7 @@ function nextMockScanDelta(record: RetailerHealthRecord): RetailerHealthRecord {
       ...nextMetrics,
       status: statusFromMetrics({ ...record, metrics: nextMetrics }),
     },
-    logs: [
-      {
-        id: `${record.retailerId}-${Date.now()}`,
-        timestamp: nowIso,
-        level: scanSucceeded ? 'info' : 'error',
-        source: 'demo',
-        message: scanSucceeded
-          ? `[DEMO] Demo scan completed. Found ${productsFound} products and ${opportunitiesFound} opportunities.`
-          : '[DEMO] Demo scan failed due to simulated timeout.',
-      },
-      ...record.logs,
-    ].slice(0, 12),
+    logs: [scanLog, ...record.logs].slice(0, 12),
   };
 }
 
@@ -122,6 +121,15 @@ export default function RetailerHealthDashboard() {
 
         const disabled = !retailer.disabled;
         const nextStatus: RetailerHealthStatus = disabled ? 'disabled' : statusFromMetrics(retailer);
+        const log: RetailerHealthLogEntry = {
+          id: `${retailer.retailerId}-${Date.now()}-disable`,
+          timestamp: new Date().toISOString(),
+          level: 'warning',
+          source: 'demo',
+          message: disabled
+            ? '[DEMO] Retailer adapter disabled by admin action.'
+            : '[DEMO] Retailer adapter re-enabled by admin action.',
+        };
 
         return {
           ...retailer,
@@ -130,18 +138,7 @@ export default function RetailerHealthDashboard() {
             ...retailer.metrics,
             status: nextStatus,
           },
-          logs: [
-            {
-              id: `${retailer.retailerId}-${Date.now()}-disable`,
-              timestamp: new Date().toISOString(),
-              level: 'warning',
-              source: 'demo',
-              message: disabled
-                ? '[DEMO] Retailer adapter disabled by admin action.'
-                : '[DEMO] Retailer adapter re-enabled by admin action.',
-            },
-            ...retailer.logs,
-          ].slice(0, 12),
+          logs: [log, ...retailer.logs].slice(0, 12),
         };
       }),
     );
