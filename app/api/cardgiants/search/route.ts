@@ -6,7 +6,7 @@ const SEARCHES = [
   'sealed sports trading card hobby blaster mega boxes',
   'sealed trading card game booster boxes',
 ];
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 
 type CatalogVariant = {
   id?: string;
@@ -115,7 +115,8 @@ async function searchCatalog(
   });
 
   if (!response.ok) {
-    throw new Error(`Card Giants catalog request failed with HTTP ${response.status}.`);
+    const responseBody = await response.text();
+    throw new Error(`Card Giants catalog request failed with HTTP ${response.status}: ${responseBody || response.statusText}`);
   }
 
   const payload = (await response.json()) as McpResponse;
